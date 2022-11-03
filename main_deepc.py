@@ -52,6 +52,7 @@ if __name__ == '__main__':
     # controller.create_Hankel_check()
     
     # offline computation
+    controller.create_Hankel_check()      
     controller.create_Hankel()       
     # ============= DeePC =============
     
@@ -125,7 +126,7 @@ if __name__ == '__main__':
     plt.ylabel('y3')
     
     
-    # Plot system evolution    
+    # Plot input evolution    
     u_plot = plt.figure(2)
     time = np.linspace(0,t_sim,n_sim);
     plt.subplot(311)

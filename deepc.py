@@ -25,7 +25,9 @@ class DeePC:
         # Objective function weight
         self.Q = params['Q']
         self.R = params['R'] 
-        # self.QT = params['P']                           # Terminal weight     
+        # self.QT = params['P']                           # Terminal weight    
+        self.lambda_slack = params['lambda_slack']        # Slack weight
+        self.lambda_g = params['lambda_g'] 
               
         # Constraints
         if constr_u:
@@ -41,6 +43,8 @@ class DeePC:
         Hankel_Ud = np.empty(((L)*self.m,self.T-L+1))
         for i in range(L):
             Hankel_Ud[self.m*i:self.m*(i+1),:] = self.uData[:,i:self.T-L+i+1]
+        print(matrix_rank(Hankel_Ud))
+        print(Hankel_Ud.shape)
         if matrix_rank(Hankel_Ud) == L*self.m:
             print("We are good to go!!")
         else:
@@ -67,6 +71,10 @@ class DeePC:
         self.Hankel_P = np.block([[self.Hankel_U_p],[self.Hankel_Y_p]])  
         self.Hankel_PF = np.block([[self.Hankel_U_p],[self.Hankel_Y_p],[self.Hankel_U_f],[self.Hankel_Y_f]])
         
+        print(self.Hankel_PF)
+        print(self.Hankel_PF.shape)
+        print(matrix_rank(self.Hankel_PF))
+        
     # def computIni(self,u_ini,y_ini):
     #     # create ini_matrix
     #     ini_matrix = np.empty((self.n*self.m + self.n*self.p,1))
@@ -80,18 +88,25 @@ class DeePC:
         g = cp.Variable((self.T - self.T_ini - self.N + 1,1))
         u = cp.Variable((self.N*self.m,1))
         y = cp.Variable((self.N*self.p,1))
-        ini_matrix = np.block([[u_ini],[y_ini]])
+        slack = cp.Variable((self.T_ini*self.p,1))
+        # ini_matrix = np.block([[u_ini],[y_ini]])
 
         # Define DeePC problem
         objective = 0
         constraints = []
         for i in range(self.N):
-            objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)+ cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R)    
-        constraints += [self.Hankel_P @ g == ini_matrix]     
+            objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)+ cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R) 
+            objective += self.lambda_slack * cp.norm(slack,1) + self.lambda_g * cp.norm(g,1)  # regularization 
+            # objective += self.lambda_slack * cp.norm(slack,2)**2 + self.lambda_g * cp.norm(g,2)**2  # regularization 
+        # constraints += [self.Hankel_P @ g == ini_matrix] 
+        constraints += [self.Hankel_U_p @ g == u_ini]   
+        # constraints += [self.Hankel_Y_p @ g == y_ini] 
+        constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
         constraints += [self.Hankel_U_f @ g == u]
         constraints += [self.Hankel_Y_f @ g == y]
         problem = cp.Problem(cp.Minimize(objective), constraints)        
         problem.solve()
+        print(g.value)
         
         return (g.value, u.value, y.value)
             
