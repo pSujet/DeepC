@@ -69,6 +69,7 @@ class DeePC:
         self.Hankel_Y_f = Hankel_Y[self.m*self.T_ini:,:]  
         
         self.Hankel_P = np.block([[self.Hankel_U_p],[self.Hankel_Y_p]])  
+        self.Hankel_F = np.block([[self.Hankel_U_f],[self.Hankel_Y_f]])
         self.Hankel_PF = np.block([[self.Hankel_U_p],[self.Hankel_Y_p],[self.Hankel_U_f],[self.Hankel_Y_f]])
         
         # print(self.Hankel_PF)
@@ -111,11 +112,43 @@ class DeePC:
         
         return (g.value, u.value, y.value)
             
-       
+    def computeDeePCNew(self,u_ini,y_ini):
+        # Set-up DeePC and solve the optimization problem
+        # Define optimizer
+        g = cp.Variable((self.T - self.T_ini - self.N + 1,1))
+        u = cp.Variable((self.N*self.m,1))
+        y = cp.Variable((self.N*self.p,1))
+        uy = cp.vstack([u,y])
+        slack = cp.Variable((self.T_ini*self.p,1))
+        ini_matrix = np.block([[u_ini],[y_ini]])
+        # print(self.T - self.T_ini - self.N + 1)
+
+        # Define DeePC problem
+        objective = 0
+        constraints = []
+        for i in range(self.N):
+            objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)+ cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R) 
+        objective += self.lambda_g * cp.norm(g,2)**2  # regularization 
+        objective += self.lambda_slack * cp.norm(slack,2)**2
+        # objective += cp.norm(u,2)
+        # constraints += [self.Hankel_U_p @ g == u_ini]   
+        # constraints += [self.Hankel_Y_p @ g == y_ini] 
+        # constraints += [self.Hankel_P @ g == ini_matrix] 
+        constraints += [self.Hankel_U_p @ g == u_ini]   
+        constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
+        constraints += [self.Hankel_F @ g == uy]
+        problem = cp.Problem(cp.Minimize(objective), constraints)  
+        problem.solve()
+        # problem.solve(verbose = True)
+        # problem.solve(verbose = True,solver = 'OSQP',max_iter = 10000)
+        # problem.solve(solver = 'ECOS',max_iters = 100000)
+        # print(g.value)
+        
+        return (g.value, u.value, y.value)   
     
     def computeInput(self, u_ini, y_ini):
         # Plan optimal controls and states over the next T samples
-        (g, uPred, yPred) = self.computeDeePC(u_ini,y_ini)
+        (g, uPred, yPred) = self.computeDeePCNew(u_ini,y_ini)
 
         # Apply the first control action in the predicted optimal sequence
         return uPred[:self.m,0]
