@@ -71,7 +71,7 @@ class DeePC:
         self.Hankel_P = np.block([[self.Hankel_U_p],[self.Hankel_Y_p]])  
         self.Hankel_PF = np.block([[self.Hankel_U_p],[self.Hankel_Y_p],[self.Hankel_U_f],[self.Hankel_Y_f]])
         
-        print(self.Hankel_PF)
+        # print(self.Hankel_PF)
         print(self.Hankel_PF.shape)
         print(matrix_rank(self.Hankel_PF))
         
@@ -96,20 +96,23 @@ class DeePC:
         constraints = []
         for i in range(self.N):
             objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)+ cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R) 
-            objective += self.lambda_slack * cp.norm(slack,1) + self.lambda_g * cp.norm(g,1)  # regularization 
+            # objective += self.lambda_slack * cp.norm(slack,1) + self.lambda_g * cp.norm(g,1)  # regularization 
             # objective += self.lambda_slack * cp.norm(slack,2)**2 + self.lambda_g * cp.norm(g,2)**2  # regularization 
+            # objective += self.lambda_g * cp.norm(g,2)**2  # regularization 
         # constraints += [self.Hankel_P @ g == ini_matrix] 
         constraints += [self.Hankel_U_p @ g == u_ini]   
-        # constraints += [self.Hankel_Y_p @ g == y_ini] 
-        constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
+        constraints += [self.Hankel_Y_p @ g == y_ini] 
+        # constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
         constraints += [self.Hankel_U_f @ g == u]
         constraints += [self.Hankel_Y_f @ g == y]
         problem = cp.Problem(cp.Minimize(objective), constraints)        
         problem.solve()
-        print(g.value)
+        # print(g.value)
         
         return (g.value, u.value, y.value)
             
+       
+    
     def computeInput(self, u_ini, y_ini):
         # Plan optimal controls and states over the next T samples
         (g, uPred, yPred) = self.computeDeePC(u_ini,y_ini)
