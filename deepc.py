@@ -33,10 +33,7 @@ class DeePC:
         if constr_u:
             self.ulim = params['ulim']
         if constr_y:
-            self.ylim = params['ylim']
-    
-    def test(self,u):
-        self.test = u
+            self.ylim = params['ylim']    
     
     def create_Hankel_check(self):
         L = self.T_ini + self.N + self.nB
@@ -65,8 +62,8 @@ class DeePC:
         self.Hankel_U_p = Hankel_U[:self.m*self.T_ini,:] 
         self.Hankel_U_f = Hankel_U[self.m*self.T_ini:,:]
 
-        self.Hankel_Y_p = Hankel_Y[:self.m*self.T_ini,:]
-        self.Hankel_Y_f = Hankel_Y[self.m*self.T_ini:,:]  
+        self.Hankel_Y_p = Hankel_Y[:self.p*self.T_ini,:]
+        self.Hankel_Y_f = Hankel_Y[self.p*self.T_ini:,:]  
         
         self.Hankel_P = np.block([[self.Hankel_U_p],[self.Hankel_Y_p]])  
         self.Hankel_F = np.block([[self.Hankel_U_f],[self.Hankel_Y_f]])
@@ -74,44 +71,34 @@ class DeePC:
         
         # print(self.Hankel_PF)
         print(self.Hankel_PF.shape)
-        print(matrix_rank(self.Hankel_PF))
-        
-    # def computIni(self,u_ini,y_ini):
-    #     # create ini_matrix
-    #     ini_matrix = np.empty((self.n*self.m + self.n*self.p,1))
-    #     ini_matrix[:self.n*self.m,:] = np.reshape(u_ini)                                # last n element
-    #     ini_matrix[self.n*self.m:self.n*self.m+self.n*self.p,:] = np.reshape(y_ini)     # last n element
-
-    
+        print(matrix_rank(self.Hankel_PF))          
+            
     def computeDeePC(self,u_ini,y_ini):
         # Set-up DeePC and solve the optimization problem
         # Define optimizer
         g = cp.Variable((self.T - self.T_ini - self.N + 1,1))
         u = cp.Variable((self.N*self.m,1))
         y = cp.Variable((self.N*self.p,1))
+        uy = cp.vstack([u,y])
         slack = cp.Variable((self.T_ini*self.p,1))
-        # ini_matrix = np.block([[u_ini],[y_ini]])
+        ulim = 1
 
         # Define DeePC problem
         objective = 0
         constraints = []
         for i in range(self.N):
             objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)+ cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R) 
-            # objective += self.lambda_slack * cp.norm(slack,1) + self.lambda_g * cp.norm(g,1)  # regularization 
-            # objective += self.lambda_slack * cp.norm(slack,2)**2 + self.lambda_g * cp.norm(g,2)**2  # regularization 
-            # objective += self.lambda_g * cp.norm(g,2)**2  # regularization 
-        # constraints += [self.Hankel_P @ g == ini_matrix] 
-        constraints += [self.Hankel_U_p @ g == u_ini]   
-        constraints += [self.Hankel_Y_p @ g == y_ini] 
-        # constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
-        constraints += [self.Hankel_U_f @ g == u]
-        constraints += [self.Hankel_Y_f @ g == y]
-        problem = cp.Problem(cp.Minimize(objective), constraints)        
-        problem.solve()
-        # print(g.value)
+            constraints += [-ulim <= u[self.m*i:self.m*(i+1),0], u[self.m*i:self.m*(i+1),0] <= ulim]
+        objective += self.lambda_g * cp.norm(g,2)**2  # regularization 
+        objective += self.lambda_slack * cp.norm(slack,2)**2
+        constraints += [self.Hankel_U_p @ g == u_ini]           
+        constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
+        constraints += [self.Hankel_F @ g == uy]
         
-        return (g.value, u.value, y.value)
-            
+        problem = cp.Problem(cp.Minimize(objective), constraints)  
+        problem.solve()      
+        return (g.value, u.value, y.value)   
+    
     def computeDeePCNew(self,u_ini,y_ini):
         # Set-up DeePC and solve the optimization problem
         # Define optimizer
@@ -120,8 +107,6 @@ class DeePC:
         y = cp.Variable((self.N*self.p,1))
         uy = cp.vstack([u,y])
         slack = cp.Variable((self.T_ini*self.p,1))
-        ini_matrix = np.block([[u_ini],[y_ini]])
-        # print(self.T - self.T_ini - self.N + 1)
 
         # Define DeePC problem
         objective = 0
@@ -130,25 +115,16 @@ class DeePC:
             objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)+ cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R) 
         objective += self.lambda_g * cp.norm(g,2)**2  # regularization 
         objective += self.lambda_slack * cp.norm(slack,2)**2
-        # objective += cp.norm(u,2)
-        # constraints += [self.Hankel_U_p @ g == u_ini]   
-        # constraints += [self.Hankel_Y_p @ g == y_ini] 
-        # constraints += [self.Hankel_P @ g == ini_matrix] 
-        constraints += [self.Hankel_U_p @ g == u_ini]   
+        constraints += [self.Hankel_U_p @ g == u_ini]           
         constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
         constraints += [self.Hankel_F @ g == uy]
         problem = cp.Problem(cp.Minimize(objective), constraints)  
-        problem.solve()
-        # problem.solve(verbose = True)
-        # problem.solve(verbose = True,solver = 'OSQP',max_iter = 10000)
-        # problem.solve(solver = 'ECOS',max_iters = 100000)
-        # print(g.value)
-        
-        return (g.value, u.value, y.value)   
+        problem.solve()      
+        return (g.value, u.value, y.value) 
     
     def computeInput(self, u_ini, y_ini):
         # Plan optimal controls and states over the next T samples
-        (g, uPred, yPred) = self.computeDeePCNew(u_ini,y_ini)
+        (g, uPred, yPred) = self.computeDeePC(u_ini,y_ini)
 
         # Apply the first control action in the predicted optimal sequence
         return uPred[:self.m,0]
