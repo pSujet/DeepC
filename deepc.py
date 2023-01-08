@@ -1,7 +1,7 @@
 # Author: Sujet Phodapol
 
-import numpy as np; 
-import cvxpy as cp; 
+import numpy as np
+import cvxpy as cp
 import control as ctrl
 from numpy.linalg import matrix_rank
 
@@ -94,7 +94,6 @@ class DeePC:
         constraints += [self.Hankel_U_p @ g == u_ini]           
         constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
         constraints += [self.Hankel_F @ g == uy]
-        
         problem = cp.Problem(cp.Minimize(objective), constraints)  
         problem.solve()      
         return (g.value, u.value, y.value)   
@@ -120,8 +119,8 @@ class DeePC:
         constraints += [self.Hankel_F @ g == uy]
         problem = cp.Problem(cp.Minimize(objective), constraints)  
         problem.solve()      
-        return (g.value, u.value, y.value) 
-    
+        return (g.value, u.value, y.value)     
+   
     def computeInput(self, u_ini, y_ini):
         # Plan optimal controls and states over the next T samples
         (g, uPred, yPred) = self.computeDeePC(u_ini,y_ini)
@@ -129,4 +128,29 @@ class DeePC:
         # Apply the first control action in the predicted optimal sequence
         return uPred[:self.m,0]
             
-        
+    def computeDeePCIPen(self,u_ini,y_ini):
+        # Set-up DeePC and solve the optimization problem
+        # Define optimizer
+        g = cp.Variable((self.T - self.T_ini - self.N + 1,1))
+        u = cp.Variable((self.N*self.m,1))
+        y = cp.Variable((self.N*self.p,1))
+        uy = cp.vstack([u,y])
+        slack = cp.Variable((self.T_ini*self.p,1))
+        ulim = 1
+        ylim = np.pi
+
+        # Define DeePC problem
+        objective = 0
+        constraints = []
+        for i in range(self.N):
+            objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)# + cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R) 
+            constraints += [-ulim <= u[self.m*i:self.m*(i+1),0], u[self.m*i:self.m*(i+1),0] <= ulim]
+            constraints += [-ylim <= y[self.p*i:self.p*(i+1),0], y[self.p*i:self.p*(i+1),0] <= ylim]
+        objective += self.lambda_g * cp.norm(g,2)**2  # regularization 
+        objective += self.lambda_slack * cp.norm(slack,2)**2
+        constraints += [self.Hankel_U_p @ g == u_ini]           
+        constraints += [self.Hankel_Y_p @ g == y_ini + slack] 
+        constraints += [self.Hankel_F @ g == uy]
+        problem = cp.Problem(cp.Minimize(objective), constraints)  
+        problem.solve()      
+        return (g.value, u.value, y.value)         
