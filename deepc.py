@@ -131,6 +131,7 @@ class DeePC:
         constraints = []
         for i in range(self.N):
             objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)+ cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R) 
+            # objective += cp.quad_form(y[self.p*i:self.p*(i+1),0],self.Q)+ cp.quad_form(u[self.m*i:self.m*(i+1),0],self.R)
             constraints += [-ulim <= u[self.m*i:self.m*(i+1),0], u[self.m*i:self.m*(i+1),0] <= ulim]
         objective += self.lambda_g * cp.norm(g,2)**2  # regularization 
         objective += self.lambda_slack * cp.norm(slack,2)**2
