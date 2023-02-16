@@ -44,8 +44,8 @@ class DeePC:
         Hankel_Ud = np.empty(((L)*self.m,self.T-L+1))
         for i in range(L):
             Hankel_Ud[self.m*i:self.m*(i+1),:] = self.uData[:,i:self.T-L+i+1]
-        print(matrix_rank(Hankel_Ud))
-        print(Hankel_Ud.shape)
+        # print(matrix_rank(Hankel_Ud))
+        # print(Hankel_Ud.shape)
         if matrix_rank(Hankel_Ud) == L*self.m:
             print("We are good to go!!")
         else:
@@ -74,8 +74,8 @@ class DeePC:
         self.Hankel_PF = np.block([[self.Hankel_U_p],[self.Hankel_Y_p],[self.Hankel_U_f],[self.Hankel_Y_f]])
         
         # print(self.Hankel_PF)
-        print(self.Hankel_PF.shape)
-        print(matrix_rank(self.Hankel_PF))          
+        # print(self.Hankel_PF.shape)
+        # print(matrix_rank(self.Hankel_PF))          
             
     def computeDeePC(self,u_ini,y_ini):
         # Set-up DeePC and solve the optimization problem
@@ -152,7 +152,6 @@ class DeePC:
     def computeInputGROUSE(self, u_ini, y_ini,U_predictor):
         # Plan optimal controls and states over the next T samples
         (g, uPred, yPred) = self.computeDeePC_GROUSE(u_ini,y_ini,U_predictor)
-        # (g, uPred, yPred) = self.computeDeePC(u_ini,y_ini)
 
         # Apply the first control action in the predicted optimal sequence
         return uPred[:self.m,0]
